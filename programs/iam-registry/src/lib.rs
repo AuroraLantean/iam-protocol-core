@@ -157,6 +157,11 @@ pub mod iam_registry {
     /// Unstake SOL and close the validator account.
     /// Returns staked SOL from the vault and rent from the ValidatorState PDA.
     /// The validator can re-register afterward.
+    ///
+    /// Mainnet requirements (not implemented for devnet):
+    /// - Unbonding period (timelock before withdrawal)
+    /// - is_active check (prevent unstake after slashing)
+    /// - Minimum vault balance guard
     pub fn unstake_validator(ctx: Context<UnstakeValidator>) -> Result<()> {
         let stake = ctx.accounts.validator_state.stake;
 

@@ -153,10 +153,11 @@ describe("iam-registry", () => {
     ];
 
     const listener = program.addEventListener("TrustScoreComputed", (event) => {
-      // recency: 3000/(30+1) ≈ 96, base = (96/100)*100 = 0 (integer truncation)
+      // recency: 3000/(30+1) = 96, base = (96/100)*100 = 0 (integer truncation)
+      // regularity: 0 (only 1 non-zero timestamp, need >= 2 gaps)
       // age: isqrt(30)*2 = 10
-      // total ≈ 10
-      expect(event.trustScore).to.be.greaterThanOrEqual(0);
+      // total = 10
+      expect(event.trustScore).to.equal(10);
     });
 
     await program.methods
