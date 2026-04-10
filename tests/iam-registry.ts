@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { expect } from "chai";
-import { IamRegistry } from "../target/types/iam_registry";
+import type { IamRegistry } from "../target/types/iam_registry";
 
 describe("iam-registry", () => {
   const provider = anchor.AnchorProvider.env();

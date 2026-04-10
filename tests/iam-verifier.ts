@@ -3,7 +3,10 @@ import { Program } from "@coral-xyz/anchor";
 import { expect } from "chai";
 import * as fs from "fs";
 import * as path from "path";
-import { IamVerifier } from "../target/types/iam_verifier";
+import type { IamVerifier } from "../target/types/iam_verifier";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load pre-generated Groth16 proof fixture
 const fixture = JSON.parse(

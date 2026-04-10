@@ -7,9 +7,12 @@ import {
   TOKEN_2022_PROGRAM_ID,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { IamRegistry } from "../target/types/iam_registry";
-import { IamAnchor } from "../target/types/iam_anchor";
-import { IamVerifier } from "../target/types/iam_verifier";
+import type { IamRegistry } from "../target/types/iam_registry";
+import type { IamAnchor } from "../target/types/iam_anchor";
+import type { IamVerifier } from "../target/types/iam_verifier";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const fixture = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, "fixtures/test_proof.json"), "utf-8")

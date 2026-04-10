@@ -7,8 +7,8 @@ import {
   getAccount,
   transfer,
 } from "@solana/spl-token";
-import { IamAnchor } from "../target/types/iam_anchor";
-import { IamRegistry } from "../target/types/iam_registry";
+import type { IamAnchor } from "../target/types/iam_anchor";
+import type { IamRegistry } from "../target/types/iam_registry";
 
 describe("iam-anchor", () => {
   const provider = anchor.AnchorProvider.env();
