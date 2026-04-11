@@ -24,3 +24,6 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test1 = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/iam-anchor.ts"
+test2 = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/iam-registry.ts"
+test3 = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/iam-verifier.ts"

@@ -44,6 +44,8 @@ const MINT_SIZE_WITH_NON_TRANSFERABLE: usize = 170;
 
 #[program]
 pub mod iam_anchor {
+    use solana_program_log::log_compute_units;
+
     use super::*;
 
     /// Mint a new IAM Anchor identity for the caller.
@@ -139,7 +141,7 @@ pub mod iam_anchor {
             mint: identity.mint,
             commitment: initial_commitment,
         });
-
+        log_compute_units();
         Ok(())
     }
 
@@ -241,7 +243,7 @@ pub mod iam_anchor {
             trust_score: identity.trust_score,
             commitment: new_commitment,
         });
-
+        log_compute_units();
         Ok(())
     }
 }

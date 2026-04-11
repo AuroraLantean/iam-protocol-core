@@ -20,4 +20,5 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 anchor-lang = "0.32.1"
 anchor-spl = { version = "0.32.1", features = ["token_2022", "token_2022_extensions", "associated_token"] }
 blake3 = "=1.8.2"
+solana-program-log = "1.1.0"
 spl-token-2022 = { version = "9", features = ["no-entrypoint"] }

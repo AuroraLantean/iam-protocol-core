@@ -25,6 +25,7 @@ declare_id!("6VBs3zr9KrfFPGd6j7aGBPQWwZa5tajVfA7HN6MMV9VW");
 
 #[program]
 pub mod iam_registry {
+    use solana_program_log::log_compute_units;
     use super::*;
 
     /// Initialize the protocol configuration. One-time admin instruction.
@@ -42,6 +43,7 @@ pub mod iam_registry {
         config.max_trust_score = max_trust_score;
         config.base_trust_increment = base_trust_increment;
         config.bump = ctx.bumps.protocol_config;
+        log_compute_units();
         Ok(())
     }
 
@@ -77,7 +79,7 @@ pub mod iam_registry {
             authority: validator_state.authority,
             stake: stake_amount,
         });
-
+        log_compute_units();
         Ok(())
     }
 
@@ -150,7 +152,7 @@ pub mod iam_registry {
             creation_timestamp,
             trust_score,
         });
-
+        log_compute_units();
         Ok(())
     }
 
@@ -182,7 +184,7 @@ pub mod iam_registry {
             authority: ctx.accounts.validator_state.authority,
             amount: stake,
         });
-
+        log_compute_units();
         Ok(())
     }
 }

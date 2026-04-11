@@ -20,6 +20,7 @@ const DEFAULT_CHALLENGE_EXPIRY: i64 = 300;
 
 #[program]
 pub mod iam_verifier {
+    use solana_program_log::log_compute_units;
     use super::*;
 
     /// Create a verification challenge with a client-generated nonce.
@@ -40,7 +41,7 @@ pub mod iam_verifier {
             nonce,
             expires_at: challenge.expires_at,
         });
-
+        log_compute_units();
         Ok(())
     }
 
@@ -89,17 +90,19 @@ pub mod iam_verifier {
             is_valid: true,
             nonce,
         });
-
+        log_compute_units();
         Ok(())
     }
 
     /// Close a used or expired challenge account to reclaim rent.
     pub fn close_challenge(_ctx: Context<CloseChallenge>) -> Result<()> {
+        log_compute_units();
         Ok(())
     }
 
     /// Close a verification result account to reclaim rent.
     pub fn close_verification_result(_ctx: Context<CloseVerificationResult>) -> Result<()> {
+        log_compute_units();
         Ok(())
     }
 }
