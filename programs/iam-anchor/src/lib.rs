@@ -132,7 +132,7 @@ pub mod iam_anchor {
         identity.current_commitment = initial_commitment;
         identity.mint = ctx.accounts.mint.key();
         identity.bump = ctx.bumps.identity_state;
-        identity.recent_timestamps = [0i64; 10];
+        identity.recent_timestamps = [0i64; 52];
 
         // Read verification fee from protocol config (cross-program, iam-registry)
         let config_data = ctx.accounts.protocol_config.try_borrow_data()?;
@@ -187,7 +187,7 @@ pub mod iam_anchor {
         identity.last_verification_timestamp = now;
 
         // Shift recent_timestamps array: drop oldest, prepend newest
-        for i in (1..10).rev() {
+        for i in (1..52).rev() {
             identity.recent_timestamps[i] = identity.recent_timestamps[i - 1];
         }
         identity.recent_timestamps[0] = now;
@@ -209,7 +209,7 @@ pub mod iam_anchor {
         // Deduplicate timestamps by calendar day (newest-first order means
         // same-day entries are adjacent). Multiple verifications on the same day
         // count once for scoring — consistency over time, not volume.
-        let mut unique_ts = [0i64; 10];
+        let mut unique_ts = [0i64; 52];
         let mut unique_count: usize = 0;
         let mut prev_day: i64 = -1;
         for ts in identity.recent_timestamps.iter() {
@@ -233,7 +233,7 @@ pub mod iam_anchor {
         let base_score = (recency_score * u64::from(base_trust_increment)) / 100;
 
         // Regularity bonus from gap consistency (unique days only)
-        let mut gaps = [0i64; 9];
+        let mut gaps = [0i64; 51];
         let mut gaps_len = 0usize;
         for i in 0..unique_count.saturating_sub(1) {
             gaps[gaps_len] = (unique_ts[i] - unique_ts[i + 1]) / 86400;
@@ -358,6 +358,9 @@ pub struct UpdateAnchor<'info> {
 
     #[account(
         mut,
+        realloc = IdentityState::LEN,
+        realloc::payer = authority,
+        realloc::zero = true,
         seeds = [b"identity", identity_state.owner.as_ref()],
         bump = identity_state.bump,
         constraint = identity_state.owner == authority.key() @ IamAnchorError::Unauthorized,
