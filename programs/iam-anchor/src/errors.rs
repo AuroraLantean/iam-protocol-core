@@ -10,4 +10,8 @@ pub enum IamAnchorError {
     ArithmeticOverflow,
     #[msg("Invalid protocol config account")]
     InvalidProtocolConfig,
+    #[msg("Identity state account failed to deserialize")]
+    InvalidIdentityState,
+    #[msg("Identity state account failed to serialize")]
+    IdentitySerializationFailed,
 }

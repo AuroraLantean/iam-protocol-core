@@ -208,7 +208,7 @@ pub mod iam_anchor {
         let mut identity = {
             let data = identity_info.try_borrow_data()?;
             IdentityState::try_deserialize(&mut &data[..])
-                .map_err(|_| error!(IamAnchorError::InvalidProtocolConfig))?
+                .map_err(|_| error!(IamAnchorError::InvalidIdentityState))?
         };
 
         // Verify ownership
@@ -307,7 +307,7 @@ pub mod iam_anchor {
         // Serialize identity state back to account
         let mut data = identity_info.try_borrow_mut_data()?;
         identity.try_serialize(&mut *data)
-            .map_err(|_| error!(IamAnchorError::ArithmeticOverflow))?;
+            .map_err(|_| error!(IamAnchorError::IdentitySerializationFailed))?;
         drop(data);
 
         // Transfer verification fee from user to protocol treasury
