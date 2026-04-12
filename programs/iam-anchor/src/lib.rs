@@ -134,6 +134,32 @@ pub mod iam_anchor {
         identity.bump = ctx.bumps.identity_state;
         identity.recent_timestamps = [0i64; 10];
 
+        // Read verification fee from protocol config (cross-program, iam-registry)
+        let config_data = ctx.accounts.protocol_config.try_borrow_data()?;
+        let verification_fee = if config_data.len() >= 69 {
+            u64::from_le_bytes([
+                config_data[61], config_data[62], config_data[63], config_data[64],
+                config_data[65], config_data[66], config_data[67], config_data[68],
+            ])
+        } else {
+            0
+        };
+        drop(config_data);
+
+        // Transfer verification fee from user to protocol treasury
+        if verification_fee > 0 {
+            system_program::transfer(
+                CpiContext::new(
+                    ctx.accounts.system_program.to_account_info(),
+                    system_program::Transfer {
+                        from: ctx.accounts.user.to_account_info(),
+                        to: ctx.accounts.treasury.to_account_info(),
+                    },
+                ),
+                verification_fee,
+            )?;
+        }
+
         emit!(AnchorMinted {
             owner: identity.owner,
             mint: identity.mint,
@@ -170,11 +196,15 @@ pub mod iam_anchor {
         // Layout: 8 disc + 32 admin + 8 min_stake + 8 challenge_expiry = offset 56
         let config_data = ctx.accounts.protocol_config.try_borrow_data()?;
         require!(
-            config_data.len() >= 61,
+            config_data.len() >= 69,
             IamAnchorError::InvalidProtocolConfig
         );
         let max_trust_score = u16::from_le_bytes([config_data[56], config_data[57]]);
         let base_trust_increment = u16::from_le_bytes([config_data[58], config_data[59]]);
+        let verification_fee = u64::from_le_bytes([
+            config_data[61], config_data[62], config_data[63], config_data[64],
+            config_data[65], config_data[66], config_data[67], config_data[68],
+        ]);
 
         // Deduplicate timestamps by calendar day (newest-first order means
         // same-day entries are adjacent). Multiple verifications on the same day
@@ -235,6 +265,23 @@ pub mod iam_anchor {
             .saturating_add(age_bonus);
         identity.trust_score = total.min(u64::from(max_trust_score)) as u16;
 
+        // Drop config borrow before CPI (Solana runtime restriction)
+        drop(config_data);
+
+        // Transfer verification fee from user to protocol treasury
+        if verification_fee > 0 {
+            system_program::transfer(
+                CpiContext::new(
+                    ctx.accounts.system_program.to_account_info(),
+                    system_program::Transfer {
+                        from: ctx.accounts.authority.to_account_info(),
+                        to: ctx.accounts.treasury.to_account_info(),
+                    },
+                ),
+                verification_fee,
+            )?;
+        }
+
         emit!(AnchorUpdated {
             owner: identity.owner,
             verification_count: identity.verification_count,
@@ -285,10 +332,28 @@ pub struct MintAnchor<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
+
+    /// CHECK: Cross-program read of iam-registry ProtocolConfig PDA.
+    #[account(
+        seeds = [b"protocol_config"],
+        bump,
+        seeds::program = REGISTRY_PROGRAM_ID,
+    )]
+    pub protocol_config: UncheckedAccount<'info>,
+
+    /// CHECK: Protocol treasury PDA on iam-registry. Receives verification fees.
+    #[account(
+        mut,
+        seeds = [b"protocol_treasury"],
+        bump,
+        seeds::program = REGISTRY_PROGRAM_ID,
+    )]
+    pub treasury: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
 pub struct UpdateAnchor<'info> {
+    #[account(mut)]
     pub authority: Signer<'info>,
 
     #[account(
@@ -307,6 +372,17 @@ pub struct UpdateAnchor<'info> {
         seeds::program = REGISTRY_PROGRAM_ID,
     )]
     pub protocol_config: UncheckedAccount<'info>,
+
+    /// CHECK: Protocol treasury PDA on iam-registry. Receives verification fees.
+    #[account(
+        mut,
+        seeds = [b"protocol_treasury"],
+        bump,
+        seeds::program = REGISTRY_PROGRAM_ID,
+    )]
+    pub treasury: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
 }
 
 // --- Events ---
