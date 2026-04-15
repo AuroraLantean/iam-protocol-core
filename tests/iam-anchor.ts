@@ -1,14 +1,15 @@
+import type { Program } from "@coral-xyz/anchor";
 import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
-import { expect } from "chai";
 import {
-  TOKEN_2022_PROGRAM_ID,
-  getAssociatedTokenAddressSync,
   getAccount,
+  getAssociatedTokenAddressSync,
+  TOKEN_2022_PROGRAM_ID,
   transfer,
 } from "@solana/spl-token";
+import { expect } from "chai";
 import type { IamAnchor } from "../target/types/iam_anchor";
 import type { IamRegistry } from "../target/types/iam_registry";
+import { deriveIdentityPda, deriveMintPda } from "./utils";
 
 describe("iam-anchor", () => {
   const provider = anchor.AnchorProvider.env();
@@ -17,33 +18,21 @@ describe("iam-anchor", () => {
   const program = anchor.workspace.iamAnchor as Program<IamAnchor>;
   const registry = anchor.workspace.iamRegistry as Program<IamRegistry>;
 
-  function deriveIdentityPda(user: anchor.web3.PublicKey) {
-    return anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("identity"), user.toBuffer()],
-      program.programId
-    );
-  }
-
-  function deriveMintPda(user: anchor.web3.PublicKey) {
-    return anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("mint"), user.toBuffer()],
-      program.programId
-    );
-  }
+  const iamAnchorProgId = program.programId;
 
   const [mintAuthorityPda] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("mint_authority")],
-    program.programId
+    iamAnchorProgId,
   );
 
   const [protocolConfigPda] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("protocol_config")],
-    registry.programId
+    registry.programId,
   );
 
   const [treasuryPda] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("protocol_treasury")],
-    registry.programId
+    registry.programId,
   );
 
   const commitment = Buffer.alloc(32);
@@ -59,7 +48,7 @@ describe("iam-anchor", () => {
           new anchor.BN(300),
           10000,
           100,
-          new anchor.BN(0)
+          new anchor.BN(0),
         )
         .accountsStrict({
           admin: provider.wallet.publicKey,
@@ -74,13 +63,13 @@ describe("iam-anchor", () => {
 
   it("mints an identity anchor", async () => {
     const user = provider.wallet;
-    const [identityPda] = deriveIdentityPda(user.publicKey);
-    const [mintPda] = deriveMintPda(user.publicKey);
+    const [identityPda] = deriveIdentityPda(user.publicKey, iamAnchorProgId);
+    const [mintPda] = deriveMintPda(user.publicKey, iamAnchorProgId);
     const ata = getAssociatedTokenAddressSync(
       mintPda,
       user.publicKey,
       false,
-      TOKEN_2022_PROGRAM_ID
+      TOKEN_2022_PROGRAM_ID,
     );
 
     await program.methods
@@ -112,20 +101,20 @@ describe("iam-anchor", () => {
       provider.connection,
       ata,
       undefined,
-      TOKEN_2022_PROGRAM_ID
+      TOKEN_2022_PROGRAM_ID,
     );
     expect(Number(tokenAccount.amount)).to.equal(1);
   });
 
   it("fails to mint duplicate identity", async () => {
     const user = provider.wallet;
-    const [identityPda] = deriveIdentityPda(user.publicKey);
-    const [mintPda] = deriveMintPda(user.publicKey);
+    const [identityPda] = deriveIdentityPda(user.publicKey, iamAnchorProgId);
+    const [mintPda] = deriveMintPda(user.publicKey, iamAnchorProgId);
     const ata = getAssociatedTokenAddressSync(
       mintPda,
       user.publicKey,
       false,
-      TOKEN_2022_PROGRAM_ID
+      TOKEN_2022_PROGRAM_ID,
     );
 
     try {
@@ -140,6 +129,8 @@ describe("iam-anchor", () => {
           associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
           tokenProgram: TOKEN_2022_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
+          protocolConfig: protocolConfigPda,
+          treasury: treasuryPda,
         })
         .rpc();
       expect.fail("Should have thrown");
@@ -152,17 +143,17 @@ describe("iam-anchor", () => {
     const user2 = anchor.web3.Keypair.generate();
     const sig = await provider.connection.requestAirdrop(
       user2.publicKey,
-      5_000_000_000
+      5_000_000_000,
     );
     await provider.connection.confirmTransaction(sig);
 
-    const [identityPda] = deriveIdentityPda(user2.publicKey);
-    const [mintPda] = deriveMintPda(user2.publicKey);
+    const [identityPda] = deriveIdentityPda(user2.publicKey, iamAnchorProgId);
+    const [mintPda] = deriveMintPda(user2.publicKey, iamAnchorProgId);
     const ata = getAssociatedTokenAddressSync(
       mintPda,
       user2.publicKey,
       false,
-      TOKEN_2022_PROGRAM_ID
+      TOKEN_2022_PROGRAM_ID,
     );
 
     await program.methods
@@ -188,7 +179,7 @@ describe("iam-anchor", () => {
 
   it("updates identity state with auto-computed trust score", async () => {
     const user = provider.wallet;
-    const [identityPda] = deriveIdentityPda(user.publicKey);
+    const [identityPda] = deriveIdentityPda(user.publicKey, iamAnchorProgId);
 
     const newCommitment = Buffer.alloc(32);
     newCommitment.write("updated_commitment_v2!", "utf-8");
@@ -209,19 +200,24 @@ describe("iam-anchor", () => {
     // Trust score is auto-computed: brand-new identity with 1 verification
     // recency_score = 3000/30 = 100, base = (100/100)*100 = 100, age ~0 days
     expect(identity.trustScore).to.be.greaterThanOrEqual(100);
-    expect(Buffer.from(identity.currentCommitment)).to.deep.equal(newCommitment);
+    expect(Buffer.from(identity.currentCommitment)).to.deep.equal(
+      newCommitment,
+    );
   });
 
   it("rejects update from unauthorized wallet", async () => {
     const attacker = anchor.web3.Keypair.generate();
     const sig = await provider.connection.requestAirdrop(
       attacker.publicKey,
-      2_000_000_000
+      2_000_000_000,
     );
     await provider.connection.confirmTransaction(sig);
 
     // Target the real user's identity PDA
-    const [identityPda] = deriveIdentityPda(provider.wallet.publicKey);
+    const [identityPda] = deriveIdentityPda(
+      provider.wallet.publicKey,
+      iamAnchorProgId,
+    );
 
     const fakeCommitment = Buffer.alloc(32);
     fakeCommitment.write("attacker_commitment!", "utf-8");
@@ -233,6 +229,8 @@ describe("iam-anchor", () => {
           authority: attacker.publicKey,
           identityState: identityPda,
           protocolConfig: protocolConfigPda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          treasury: treasuryPda,
         })
         .signers([attacker])
         .rpc();
@@ -244,7 +242,7 @@ describe("iam-anchor", () => {
 
   it("charges verification fee on update_anchor", async () => {
     const user = provider.wallet;
-    const [identityPda] = deriveIdentityPda(user.publicKey);
+    const [identityPda] = deriveIdentityPda(user.publicKey, iamAnchorProgId);
 
     // Set verification fee to 5_000_000 lamports (0.005 SOL)
     await registry.methods
@@ -288,18 +286,18 @@ describe("iam-anchor", () => {
 
   it("rejects transfer of non-transferable token", async () => {
     const user = provider.wallet;
-    const [mintPda] = deriveMintPda(user.publicKey);
+    const [mintPda] = deriveMintPda(user.publicKey, iamAnchorProgId);
     const sourceAta = getAssociatedTokenAddressSync(
       mintPda,
       user.publicKey,
       false,
-      TOKEN_2022_PROGRAM_ID
+      TOKEN_2022_PROGRAM_ID,
     );
 
     const recipient = anchor.web3.Keypair.generate();
     const sig = await provider.connection.requestAirdrop(
       recipient.publicKey,
-      1_000_000_000
+      1_000_000_000,
     );
     await provider.connection.confirmTransaction(sig);
 
@@ -307,7 +305,7 @@ describe("iam-anchor", () => {
       mintPda,
       recipient.publicKey,
       false,
-      TOKEN_2022_PROGRAM_ID
+      TOKEN_2022_PROGRAM_ID,
     );
 
     try {
@@ -320,7 +318,7 @@ describe("iam-anchor", () => {
         1,
         [],
         undefined,
-        TOKEN_2022_PROGRAM_ID
+        TOKEN_2022_PROGRAM_ID,
       );
       expect.fail("Transfer should have been rejected");
     } catch (err: any) {
