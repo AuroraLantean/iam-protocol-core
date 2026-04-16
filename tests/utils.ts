@@ -4,7 +4,6 @@ import { web3 } from "@coral-xyz/anchor";
 
 type PublicKey = web3.PublicKey;
 
-export const ll = console.log;
 //--------- iamAnchor
 export const deriveIdentityPda = (
   user: PublicKey,

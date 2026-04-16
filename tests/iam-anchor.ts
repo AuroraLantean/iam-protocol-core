@@ -16,7 +16,6 @@ import {
   deriveMintPda,
   deriveVerificationPda,
   generateNonce,
-  ll,
   loadProofFixture,
 } from "./utils";
 
@@ -212,7 +211,7 @@ describe("iam-anchor", () => {
     expect(identity.verificationCount).to.equal(1);
     // Trust score is auto-computed: brand-new identity with 1 verification
     // recency_score = 3000/30 = 100, base = (100/100)*100 = 100, age ~0 days
-    ll("1 verif trustScore:", identity.trustScore);
+    console.log("1 verif trustScore:", identity.trustScore);
     expect(identity.trustScore).to.be.greaterThanOrEqual(100);
     expect(Buffer.from(identity.currentCommitment)).to.deep.equal(
       newCommitment,
@@ -349,7 +348,7 @@ describe("iam-anchor", () => {
     let identity = await program.account.identityState.fetch(identityPda);
     expect(identity.verificationCount).to.equal(2);
     trustScore2vrf = identity.trustScore;
-    ll("2 verif trustScore:", trustScore2vrf);
+    console.log("2 verif trustScore:", trustScore2vrf);
     expect(trustScore2vrf).to.equal(trustScore1vrf);
 
     //-----------== iamVerifier
@@ -390,7 +389,7 @@ describe("iam-anchor", () => {
 
     //-----------== iamAnchor: updates identity state with auto-computed trust score
     const newCommitment = Buffer.alloc(32);
-    newCommitment.write("updated_commitment_v2!", "utf-8");
+    newCommitment.write("dedup_trust_score_test!!!", "utf-8");
 
     await program.methods
       .updateAnchor(Array.from(newCommitment))
@@ -405,7 +404,7 @@ describe("iam-anchor", () => {
 
     identity = await program.account.identityState.fetch(identityPda);
     expect(identity.verificationCount).to.equal(3);
-    ll("3 verif trustScore:", identity.trustScore);
+    console.log("3 verif trustScore:", identity.trustScore);
     expect(identity.trustScore).to.equal(trustScore2vrf);
   });
 });
