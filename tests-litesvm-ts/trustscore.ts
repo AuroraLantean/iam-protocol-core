@@ -10,7 +10,7 @@ import {
 import { expect } from "chai";
 import type { IamAnchor } from "../target/types/iam_anchor";
 import type { IamRegistry } from "../target/types/iam_registry";
-import { decodeProtocolConfigWeb3js } from "./encodeDecode";
+import { decodeProtocolConfigWeb3js } from "./encodeDecode.ts";
 import {
   acctEqual,
   acctIsNull,
@@ -19,7 +19,7 @@ import {
   readAcct,
   registryAddr,
   svm,
-} from "./litesvm-utils";
+} from "./litesvm-utils.ts";
 
 /*
 Build the Solana programs first:

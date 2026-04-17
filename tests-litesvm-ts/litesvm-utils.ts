@@ -13,7 +13,7 @@ import {
   type SimulatedTransactionInfo,
   TransactionMetadata,
 } from "litesvm";
-import { numToBytes } from "./encodeDecode";
+import { numToBytes } from "./encodeDecode.ts";
 
 export let svm = new LiteSVM();
 

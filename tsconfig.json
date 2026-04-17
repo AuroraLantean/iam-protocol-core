@@ -6,6 +6,8 @@
     "module": "commonjs",
     "target": "es2025",
     "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "strict": true,
     "rootDir": "."
   }
