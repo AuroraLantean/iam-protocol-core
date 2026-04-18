@@ -199,7 +199,7 @@ export const updateAnchor = (
 export const createChallenge = (
   signer: Keypair, //challenger
   nonce: number[],
-  challenge: PublicKey,
+  challengePda: PublicKey,
   //systemProgram: PublicKey,
 ) => {
   const disc = [170, 244, 47, 1, 1, 15, 173, 239]; //copied from Anchor IDL
@@ -209,7 +209,7 @@ export const createChallenge = (
   const ix = new TransactionInstruction({
     keys: [
       { pubkey: signer.publicKey, isSigner: true, isWritable: true },
-      { pubkey: challenge, isSigner: false, isWritable: true },
+      { pubkey: challengePda, isSigner: false, isWritable: true },
       { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
     ],
     programId: progAddr,
@@ -219,14 +219,10 @@ export const createChallenge = (
 };
 
 //-------------== Time Manipulation
-export const getTime = () => {
+export const getJsTime = () => {
   const time = Math.floor(Date.now() / 1000);
   console.log("JS time:", time);
   return time;
-};
-export const getTimeBig = () => {
-  const time = getTime();
-  return BigInt(time);
 };
 export const setTime = (time: bigint) => {
   const clock = svm.getClock();
@@ -236,7 +232,7 @@ export const setTime = (time: bigint) => {
 export const day = 86400; // seconds
 export const warpTime = (seconds: number) => {
   const clock = svm.getClock();
-  clock.unixTimestamp = getTimeBig() + BigInt(seconds);
+  clock.unixTimestamp += BigInt(seconds);
   svm.setClock(clock);
 };
 //-------------== Deployment

@@ -26,11 +26,13 @@ import {
   ataBalCk,
   createChallenge,
   day,
+  getJsTime,
   iamAnchorAddr,
   initializeProtocol,
   mintAnchor,
   readAcct,
   registryAddr,
+  setTime,
   updateAnchor,
   warpTime,
 } from "./litesvm-utils.ts";
@@ -46,7 +48,7 @@ commitment.write("initial_commitment_test", "utf-8");
 let signerKp: Keypair;
 let signer: PublicKey;
 let trustscorePrev: number;
-warpTime(0);
+setTime(BigInt(getJsTime()));
 
 test("registry.initializeProtocol()", async () => {
   signerKp = adminKp;
@@ -120,7 +122,7 @@ test("iamAnchor.updateAnchor()", async () => {
   signer = signerKp.publicKey;
   const [identityPda] = deriveIdentityPda(signer);
   const newCommitment = Buffer.alloc(32);
-  newCommitment.write("updated_commitment_v2!", "utf-8");
+  newCommitment.write("updated_commitment_v1!", "utf-8");
 
   updateAnchor(
     signerKp,
@@ -136,13 +138,13 @@ test("iamAnchor.updateAnchor()", async () => {
   trustscorePrev = decoded.trust_score;
 });
 
-test("iamAnchor.updateAnchor() 2nd time after 1 day", async () => {
+test("iamAnchor.updateAnchor() 2nd & 3rd time", async () => {
   //warp 1 day + create_challenge + verify_proof + update_anchor: trust score should be ~196
   signerKp = adminKp;
   signer = signerKp.publicKey;
   const [identityPda] = deriveIdentityPda(signer);
   const newCommitment = Buffer.alloc(32);
-  newCommitment.write("updated_commitment_v3!", "utf-8");
+  newCommitment.write("updated_commitment_v2!", "utf-8");
 
   warpTime(1 * day);
 
@@ -157,17 +159,32 @@ test("iamAnchor.updateAnchor() 2nd time after 1 day", async () => {
   const decoded = decodeIdentityStateWeb3js(rawAccountData);
   expect(decoded.verification_count).to.equal(2);
   expect(decoded.trust_score).greaterThan(trustscorePrev); //198
+  trustscorePrev = decoded.trust_score;
+
+  const newCommitment3 = Buffer.alloc(32);
+  newCommitment3.write("updated_commitment_v3!", "utf-8");
+  warpTime(1 * day);
+
+  updateAnchor(
+    signerKp,
+    newCommitment3,
+    identityPda,
+    protocolConfigPda,
+    treasuryPda,
+  );
+  const rawAccountData3 = readAcct(identityPda);
+  const decoded3 = decodeIdentityStateWeb3js(rawAccountData3);
+  expect(decoded3.verification_count).to.equal(3);
+  expect(decoded3.trust_score).greaterThan(trustscorePrev); //311
 });
 
 test("iamVerifier.createChallenge()", async () => {
   signerKp = adminKp;
   signer = signerKp.publicKey;
 
-  const nonce = generateNonce();
+  const nonce = generateNonce(); // array of 32 u8 in Anchor IDL
   const [challengePda] = deriveChallengePda(signer, nonce);
   const [_verificationPda] = deriveVerificationPda(signer, nonce);
 
   createChallenge(signerKp, nonce, challengePda);
-
-  //TODO: verify_proof + update_anchor
 });
