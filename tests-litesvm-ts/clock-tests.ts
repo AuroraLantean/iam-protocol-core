@@ -1,61 +1,38 @@
 import { test } from "node:test";
 import {
-  Keypair,
-  LAMPORTS_PER_SOL,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-} from "@solana/web3.js";
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+  TOKEN_2022_PROGRAM_ID,
+} from "@solana/spl-token";
+import type { Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import {
+  decodeIdentityStateWeb3js,
   decodeProtocolConfigWeb3js,
+  deriveIdentityPda,
+  deriveMintPda,
+  mintAuthorityPda,
   protocolConfigBump,
   protocolConfigPda,
+  treasuryPda,
 } from "./encodeDecode.ts";
 import {
   acctEqual,
   acctIsNull,
   adminKp,
+  ataBalCk,
+  iamAnchorAddr,
   initializeProtocol,
+  mintAnchor,
   readAcct,
   registryAddr,
-  svm,
 } from "./litesvm-utils.ts";
-
-/*
-Build the Solana programs first:
-$ anchor build
-Then Install NodeJs v25.9.0(or above v22.18.0) to run this TypeScript Natively: node ./file_path/this_file.ts
-Or use Bun: bun test ./file_path/this_file.ts
-*/
 
 const commitment = Buffer.alloc(32);
 commitment.write("initial_commitment_test", "utf-8");
 
 let signerKp: Keypair;
 let signer: PublicKey;
-
-test("transfer SOL", () => {
-  const payer = new Keypair();
-  svm.airdrop(payer.publicKey, BigInt(LAMPORTS_PER_SOL));
-  const receiver = PublicKey.unique();
-  const blockhash = svm.latestBlockhash();
-  const transferLamports = BigInt(1_000_000);
-  const ixs = [
-    SystemProgram.transfer({
-      fromPubkey: payer.publicKey,
-      toPubkey: receiver,
-      lamports: transferLamports,
-    }),
-  ];
-  const tx = new Transaction();
-  tx.recentBlockhash = blockhash;
-  tx.add(...ixs);
-  tx.sign(payer);
-  svm.sendTransaction(tx);
-  const balanceAfter = svm.getBalance(receiver);
-  expect(balanceAfter).eq(transferLamports);
-});
 
 test("registry.initializeProtocol()", async () => {
   signerKp = adminKp;
@@ -85,4 +62,40 @@ test("registry.initializeProtocol()", async () => {
   expect(decoded.base_trust_increment).eq(base_trust_increment);
   expect(decoded.bump).eq(protocolConfigBump);
   expect(decoded.verification_fee).eq(verification_fee);
+});
+
+test("registry.mintAnchor()", async () => {
+  signerKp = adminKp;
+  signer = signerKp.publicKey;
+  const [identityPda] = deriveIdentityPda(signer);
+  const [mintPda] = deriveMintPda(signer);
+  const tokenProgram = TOKEN_2022_PROGRAM_ID;
+  const ata = getAssociatedTokenAddressSync(
+    mintPda,
+    signer,
+    false,
+    tokenProgram,
+  );
+
+  mintAnchor(
+    signerKp,
+    commitment,
+    identityPda,
+    mintPda,
+    mintAuthorityPda,
+    ata,
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    tokenProgram,
+    protocolConfigPda,
+    treasuryPda,
+  );
+  const rawAccountData = readAcct(identityPda, iamAnchorAddr);
+  const decoded = decodeIdentityStateWeb3js(rawAccountData);
+  acctEqual(decoded.owner, signer);
+  expect(decoded.verification_count).to.equal(0);
+  expect(decoded.trust_score).to.equal(0);
+  console.log("expected commitment:", commitment.buffer);
+  expect(Buffer.from(decoded.current_commitment)).to.deep.equal(commitment);
+  acctEqual(decoded.mint, mintPda);
+  ataBalCk(ata, BigInt(1), "IdentityMint", 0);
 });

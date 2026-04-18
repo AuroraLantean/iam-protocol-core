@@ -1,3 +1,4 @@
+import { AccountLayout } from "@solana/spl-token";
 import {
   Keypair,
   LAMPORTS_PER_SOL,
@@ -73,7 +74,32 @@ export const readAcct = (acct1: PublicKey, acctOwner: PublicKey) => {
   acctEqual(pdaRaw?.owner, acctOwner);
   return rawAccountData;
 };
-//-------------== Program Methods
+export const ataBalc = (
+  ata: PublicKey,
+  name = "token balc",
+  isVerbose = true,
+) => {
+  const raw = svm.getAccount(ata);
+  if (!raw) {
+    if (isVerbose) console.log(name, ": ata is null");
+    return zero;
+  }
+  const rawAcctData = raw?.data;
+  const decoded = AccountLayout.decode(rawAcctData);
+  if (isVerbose) console.log(name, ":", decoded.amount);
+  return decoded.amount;
+};
+export const ataBalCk = (
+  ata: PublicKey,
+  expectedAmount: bigint,
+  name: string,
+  decimals = 6,
+) => {
+  const amount = ataBalc(ata, name, false);
+  console.log(name, "token:", amount, amount / BigInt(10 ** decimals));
+  expect(amount).eq(expectedAmount);
+};
+//-------------== iamRegistry Program Methods
 export const initializeProtocol = (
   signer: Keypair,
   protocol_config: PublicKey,
@@ -105,6 +131,42 @@ export const initializeProtocol = (
     data: Buffer.from([...disc, ...argData]),
   });
   sendTxns(svm, blockhash, [ix], [signer], registryAddr);
+};
+//-------------== iamAnchor Program Methods
+export const mintAnchor = (
+  signer: Keypair,
+  commitment: Buffer<ArrayBuffer>,
+  identity_state: PublicKey,
+  mint: PublicKey,
+  mintAuthority: PublicKey,
+  tokenAccount: PublicKey,
+  associatedTokenProgram: PublicKey,
+  tokenProgram: PublicKey,
+  //systemProgram: PublicKey,
+  protocol_config: PublicKey,
+  treasury: PublicKey,
+) => {
+  const disc = [68, 56, 113, 102, 236, 152, 146, 60]; //copied from Anchor IDL
+  const progAddr = iamAnchorAddr;
+  const argData = [...commitment];
+  const blockhash = svm.latestBlockhash();
+  const ix = new TransactionInstruction({
+    keys: [
+      { pubkey: signer.publicKey, isSigner: true, isWritable: true },
+      { pubkey: identity_state, isSigner: false, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: true },
+      { pubkey: mintAuthority, isSigner: false, isWritable: false }, //non writable
+      { pubkey: tokenAccount, isSigner: false, isWritable: true },
+      { pubkey: associatedTokenProgram, isSigner: false, isWritable: false },
+      { pubkey: tokenProgram, isSigner: false, isWritable: false },
+      { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
+      { pubkey: protocol_config, isSigner: false, isWritable: false }, //belongs to registry
+      { pubkey: treasury, isSigner: false, isWritable: true },
+    ],
+    programId: progAddr,
+    data: Buffer.from([...disc, ...argData]),
+  });
+  sendTxns(svm, blockhash, [ix], [signer], progAddr);
 };
 //-------------== Deployment
 export const deployProgram = (
