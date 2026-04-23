@@ -108,6 +108,7 @@ export const readAcct = (acct1: PublicKey, acctOwner?: PublicKey) => {
   if (acctOwner) acctEqual(pdaRaw?.owner, acctOwner);
   return rawAccountData;
 };
+export const balcSol = (target: PublicKey) => svm.getBalance(target);
 export const ataBalc = (
   ata: PublicKey,
   name = "token balc",

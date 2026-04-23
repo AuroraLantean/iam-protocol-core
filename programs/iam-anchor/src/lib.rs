@@ -679,7 +679,7 @@ pub struct MigradeIdentity<'info> {
     #[account(
         mut,
         seeds = [b"identity", wallet_old.key().as_ref()],
-        bump,
+        bump, close = user
     )]
     pub identity_state_old: Account<'info, IdentityState>,
 

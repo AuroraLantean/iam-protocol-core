@@ -30,6 +30,7 @@ import {
   adminKp,
   ataBalCk,
   authorizeNewWallet,
+  balcSol,
   day,
   defaultRecentTimestamps,
   expectTheSameArray,
@@ -142,8 +143,9 @@ test("iamAnchor.updateAnchor()", async () => {
     protocolConfigPda,
     treasuryPda,
   );
-  const rawAccountData = readAcct(identityPda);
-  const decoded = decodeIdentityPdaDev(rawAccountData);
+  const rawData = readAcct(identityPda);
+  const decoded = decodeIdentityPdaDev(rawData);
+  identityOld = decoded;
   expect(decoded.verification_count).to.equal(1);
   expect(decoded.trust_score).to.equal(100);
   trustscorePrev = decoded.trust_score;
@@ -219,9 +221,6 @@ test("iamAnchor.migrateIdentity() by user1", async () => {
   identity = decodeIdentityPdaDev(rawAccData);
   acctEqual(identity.owner, signerKp.publicKey);
 
-  rawAccData = readAcct(pdasAdmin.identityPda, iamAnchorAddr);
-  identityOld = decodeIdentityPdaDev(rawAccData);
-
   expect(identity.last_verification_timestamp).to.equal(
     identityOld.last_verification_timestamp,
   );
@@ -243,6 +242,8 @@ test("iamAnchor.migrateIdentity() by user1", async () => {
     ", verification_count:",
     identity.verification_count,
   );
+  expect(balcSol(pdasAdmin.identityPda)).eq(null);
+  acctIsNull(pdasAdmin.identityPda);
 });
 
 // TODO: A second successful updateAnchor would need another fixture proof where commitment_prev = public_inputs[0] of the first, which means regenerating fixtures

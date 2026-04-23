@@ -27,6 +27,7 @@ import {
   adminKp,
   ataBalCk,
   authorizeNewWallet,
+  balcSol,
   day,
   defaultRecentTimestamps,
   expectTheSameArray,
@@ -122,6 +123,7 @@ test("iamAnchor.authorizeNewWallet()", async () => {
   authorizeNewWallet(adminKp, pdas.identityPda, signer2Kp);
   rawAccData = readAcct(pdas.identityPda, iamAnchorAddr);
   identity = decodeIdentityPdaDev(rawAccData);
+  identityOld = identity;
   acctEqual(identity.owner, signerKp.publicKey);
   console.log("user1:", user1.toBase58());
   acctEqual(identity.new_wallet, signer2Kp.publicKey);
@@ -182,9 +184,6 @@ test("iamAnchor.migrateIdentity() by user1", async () => {
   identity = decodeIdentityPdaDev(rawAccData);
   acctEqual(identity.owner, signerKp.publicKey);
 
-  rawAccData = readAcct(pdasAdmin.identityPda, iamAnchorAddr);
-  identityOld = decodeIdentityPdaDev(rawAccData);
-
   expect(identity.last_verification_timestamp).to.equal(
     identityOld.last_verification_timestamp,
   );
@@ -195,8 +194,10 @@ test("iamAnchor.migrateIdentity() by user1", async () => {
   expect(Buffer.from(identity.current_commitment)).to.deep.equal(
     identityOld.current_commitment,
   );
-  console.log("before bigint[]");
   expectTheSameArray(identity.recent_timestamps, identityOld.recent_timestamps);
   acctEqual(identity.mint, pdas.mintPda);
   console.log("t0", t0, ", t1", t1);
+
+  expect(balcSol(pdasAdmin.identityPda)).eq(null);
+  acctIsNull(pdasAdmin.identityPda);
 });
