@@ -208,7 +208,5 @@ test("iamAnchor.migrateIdentity() by user1", async () => {
   expect(balcSol(pdasAdmin.identityPda)).eq(null);
   acctIsNull(pdasAdmin.identityPda);
   balcAtaCk(pdasAdmin.ata, zero, "Mint_Old", 0);
-  //TODO: Make TokenProgram to close old Mint and close TokenAccount...
-  //acctIsNull(pdasAdmin.mintPda);
-  //acctIsNull(ata);
+  acctIsNull(pdasAdmin.mintPda);
 });

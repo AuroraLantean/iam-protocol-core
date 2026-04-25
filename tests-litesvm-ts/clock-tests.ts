@@ -45,6 +45,7 @@ import {
   user1Kp,
   verifyUser,
   warpTime,
+  zero,
 } from "./litesvm-utils.ts";
 
 /* Build the Solana programs first:
@@ -215,6 +216,8 @@ test("iamAnchor.migrateIdentity() by user1", async () => {
   );
   expect(balcSol(pdasAdmin.identityPda)).eq(null);
   acctIsNull(pdasAdmin.identityPda);
+  balcAtaCk(pdasAdmin.ata, zero, "Mint_Old", 0);
+  acctIsNull(pdasAdmin.mintPda);
 });
 
 // TODO: A second successful updateAnchor would need another fixture proof where commitment_prev = public_inputs[0] of the first, which means regenerating fixtures
