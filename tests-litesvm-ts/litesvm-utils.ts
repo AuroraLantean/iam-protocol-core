@@ -319,7 +319,7 @@ export const migrateIdentity = (
       { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
       { pubkey: protocol_config, isSigner: false, isWritable: false }, //belongs to registry
       { pubkey: treasury, isSigner: false, isWritable: true },
-      { pubkey: wallet_old, isSigner: false, isWritable: false },
+      { pubkey: wallet_old, isSigner: false, isWritable: true },
       { pubkey: identity_state_old, isSigner: false, isWritable: true },
       { pubkey: mint_old, isSigner: false, isWritable: true },
       { pubkey: token_account_old, isSigner: false, isWritable: true },

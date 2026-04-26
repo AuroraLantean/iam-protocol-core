@@ -256,6 +256,7 @@ export type ProtocolConfigAcct = {
   base_trust_increment: number;
   bump: number;
   verification_fee: bigint;
+  migration_fee: bigint;
 }; //padding: bigint[];
 export const protocolconfigAcctDecoder: FixedSizeDecoder<ProtocolConfigAcct> =
   getStructDecoder([
@@ -267,6 +268,7 @@ export const protocolconfigAcctDecoder: FixedSizeDecoder<ProtocolConfigAcct> =
     ["base_trust_increment", getU16Decoder()],
     ["bump", getU8Decoder()],
     ["verification_fee", getU64Decoder()],
+    ["migration_fee", getU64Decoder()],
     //["padding", getArrayDecoder(getU64Decoder(), { size: 3 })],
   ]);
 export const decodeProtocolConfig = (
@@ -282,6 +284,7 @@ export const decodeProtocolConfig = (
     console.log("base_trust_increment:", decoded.base_trust_increment);
     console.log("bump:", decoded.bump);
     console.log("verification_fee:", decoded.verification_fee);
+    console.log("migration_fee:", decoded.migration_fee);
   }
   return decoded;
 };
@@ -299,6 +302,7 @@ export const decodeProtocolConfigDev = (
     base_trust_increment: decoded.base_trust_increment,
     bump: decoded.bump,
     verification_fee: decoded.verification_fee,
+    migration_fee: decoded.migration_fee,
   };
   return decodedV1;
 };
@@ -310,6 +314,7 @@ export type ProtocolConfigAcctDev = {
   base_trust_increment: number;
   bump: number;
   verification_fee: bigint;
+  migration_fee: bigint;
 };
 
 //-------------== Encode numbers

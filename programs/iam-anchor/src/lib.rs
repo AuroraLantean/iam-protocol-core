@@ -121,7 +121,7 @@ pub mod iam_anchor {
         // 1. Allocate mint account with space for NonTransferable extension
         let rent = Rent::get()?;
         let lamports = rent.minimum_balance(space);
-        //msg!("create_account");
+        msg!("create_account");
         system_program::create_account(
             CpiContext::new_with_signer(
                 ctx.accounts.system_program.to_account_info(),
@@ -137,14 +137,14 @@ pub mod iam_anchor {
         )?;
 
         // 2. Initialize NonTransferable extension (MUST be before InitializeMint2)
-        //msg!("initialize_non_transferable_mint");
+        msg!("initialize_non_transferable_mint");
         let ix = spl_token_2022::instruction::initialize_non_transferable_mint(
             ctx.accounts.token_program.key,
             &ctx.accounts.mint.key(),
         )?;
         anchor_lang::solana_program::program::invoke(&ix, &[ctx.accounts.mint.to_account_info()])?;
 
-        //msg!("initialize_close_authority");
+        msg!("initialize_close_authority");
         let ix = spl_token_2022::instruction::initialize_mint_close_authority(
             ctx.accounts.token_program.key,
             &ctx.accounts.mint.key(),
@@ -153,7 +153,7 @@ pub mod iam_anchor {
         anchor_lang::solana_program::program::invoke(&ix, &[ctx.accounts.mint.to_account_info()])?;
         
         // 3. Initialize the mint (decimals=0, authority=mint_authority PDA)
-        //msg!("initialize_mint");
+        msg!("initialize_mint");
         let ix = spl_token_2022::instruction::initialize_mint2(
             ctx.accounts.token_program.key,
             &ctx.accounts.mint.key(),
@@ -164,7 +164,7 @@ pub mod iam_anchor {
         anchor_lang::solana_program::program::invoke(&ix, &[ctx.accounts.mint.to_account_info()])?;
 
         // 4. Create the user's Associated Token Account
-        //msg!("create user ata");
+        msg!("create user ata");
         anchor_spl::associated_token::create(CpiContext::new(
             ctx.accounts.associated_token_program.to_account_info(),
             anchor_spl::associated_token::Create {
@@ -178,7 +178,7 @@ pub mod iam_anchor {
         ))?;
 
         // 5. Mint exactly 1 token to the user's ATA
-        //msg!("mint 1 token");
+        msg!("mint 1 token");
         token_2022::mint_to(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -193,7 +193,7 @@ pub mod iam_anchor {
         )?;
 
         // 6. Initialize IdentityState PDA
-        //msg!("initialize IdentityState");
+        msg!("initialize IdentityState");
         let identity = &mut ctx.accounts.identity_state;
         let now = Clock::get()?.unix_timestamp;
         identity.owner = ctx.accounts.user.key();
@@ -257,8 +257,9 @@ pub mod iam_anchor {
         Ok(())
     }
 
-    /// Migrade from an user's old IAM Anchor IdentityState PDA to a new one
-    pub fn migrate_identity(ctx: Context<MigradeIdentity>) -> Result<()> {
+    /// Migrate from an user's old IAM Anchor IdentityState PDA to a new one
+    /// After this function call, the orphaned 0-balance ATA, pointing at a closed mint, locks ~0.002 SOL of rent. This ATA can be recovered by the old wallet calling closeAccount()
+    pub fn migrate_identity(ctx: Context<MigrateIdentity>) -> Result<()> {
         let user_key = ctx.accounts.user.key();
         let mint_seeds: &[&[u8]] = &[b"mint", user_key.as_ref(), &[ctx.bumps.mint]];
         let mint_authority_seeds: &[&[u8]] = &[b"mint_authority", &[ctx.bumps.mint_authority]];
@@ -274,7 +275,7 @@ pub mod iam_anchor {
         let rent = Rent::get()?;
         let lamports = rent.minimum_balance(space);
 
-        //msg!("create_account");
+        msg!("create_account");
         system_program::create_account(
             CpiContext::new_with_signer(
                 ctx.accounts.system_program.to_account_info(),
@@ -290,14 +291,14 @@ pub mod iam_anchor {
         )?;
 
         // 2. Initialize NonTransferable extension (MUST be before InitializeMint2)
-        //msg!("initialize_non_transferable");
+        msg!("initialize_non_transferable");
         let ix = spl_token_2022::instruction::initialize_non_transferable_mint(
             ctx.accounts.token_program.key,
             &ctx.accounts.mint.key(),
         )?;
         anchor_lang::solana_program::program::invoke(&ix, &[ctx.accounts.mint.to_account_info()])?;
         
-        //msg!("initialize_close_authority");
+        msg!("initialize_close_authority");
         let ix = spl_token_2022::instruction::initialize_mint_close_authority(
             ctx.accounts.token_program.key,
             &ctx.accounts.mint.key(),
@@ -306,7 +307,7 @@ pub mod iam_anchor {
         anchor_lang::solana_program::program::invoke(&ix, &[ctx.accounts.mint.to_account_info()])?;
         
         // 3. Initialize the mint (decimals=0, authority=mint_authority PDA)
-        //msg!("initialize_mint");
+        msg!("initialize_mint");
         let ix = spl_token_2022::instruction::initialize_mint2(
             ctx.accounts.token_program.key,
             &ctx.accounts.mint.key(),
@@ -365,10 +366,10 @@ pub mod iam_anchor {
 
         // Read verification fee from protocol config (cross-program, iam-registry)
         let config_data = ctx.accounts.protocol_config.try_borrow_data()?;
-        let verification_fee = if config_data.len() >= 69 {
+        let migration_fee = if config_data.len() >= 77 {
             u64::from_le_bytes([
-                config_data[61], config_data[62], config_data[63], config_data[64],
-                config_data[65], config_data[66], config_data[67], config_data[68],
+                config_data[69], config_data[70], config_data[71], config_data[72],
+                config_data[73], config_data[74], config_data[75], config_data[76],
             ])
         } else {
             0
@@ -376,7 +377,7 @@ pub mod iam_anchor {
         drop(config_data);
 
         // Transfer verification fee from user to protocol treasury
-        if verification_fee > 0 {
+        if migration_fee > 0 {
             system_program::transfer(
                 CpiContext::new(
                     ctx.accounts.system_program.to_account_info(),
@@ -385,7 +386,7 @@ pub mod iam_anchor {
                         to: ctx.accounts.treasury.to_account_info(),
                     },
                 ),
-                verification_fee,
+                migration_fee,
             )?;
         }
 
@@ -399,7 +400,7 @@ pub mod iam_anchor {
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         burn(cpi_ctx, 1)?;
         
-        //msg!("Close the old mint account");
+        msg!("Close the old mint account");
         close_account(CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             CloseAccount {
@@ -410,7 +411,7 @@ pub mod iam_anchor {
             &[mint_authority_seeds],
         ))?;
 
-        emit!(MigrateIdentity {
+        emit!(MigrateIdentityEvent {
             wallet_old: ctx.accounts.wallet_old.key(),
             wallet_new: user_key,
             identity_old: ctx.accounts.identity_state_old.key(),
@@ -838,20 +839,13 @@ pub struct AuthorizeNewWallet<'info> {
     #[account(mut)]
     pub signer_new: Signer<'info>,
 
-    /*/// CHECK: No data stored.
-    #[account(
-        seeds = [b"mint_authority"],
-        bump,
-    )]
-    pub mint_authority: UncheckedAccount<'info>,*/
-
+    /// CHECK: Created manually via CPI to support Token-2022 NonTransferable extension
+    /// initialization ordering. PDA seeds ensure uniqueness per user.
     pub token_program: Interface<'info, TokenInterface>,
     #[account(
         mut,
         seeds = [b"mint", signer.key().as_ref()],
         bump,
-        //constraint = mint.close_authority == Some(signer.key())
-        //extensions::close_authority::authority = signer,
     )]
     pub mint: InterfaceAccount<'info, Mint>,
     #[account(mut,
@@ -861,7 +855,7 @@ pub struct AuthorizeNewWallet<'info> {
     pub token_account: InterfaceAccount<'info, TokenAccount>,
 }
 #[derive(Accounts)]
-pub struct MigradeIdentity<'info> {
+pub struct MigrateIdentity<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
@@ -873,7 +867,8 @@ pub struct MigradeIdentity<'info> {
         bump,
     )]
     pub identity_state: Box<Account<'info, IdentityState>>,
-    /// CHECK: TODO
+    /// CHECK: Created manually via CPI to support Token-2022 NonTransferable extension
+    /// initialization ordering. PDA seeds ensure uniqueness per user.
     #[account(
         mut,
         seeds = [b"mint", user.key().as_ref()],
@@ -887,7 +882,7 @@ pub struct MigradeIdentity<'info> {
         bump,
     )]
     pub mint_authority: UncheckedAccount<'info>,
-    /// CHECK: TODO
+    /// CHECK: Created via associated_token CPI. Validated by the ATA program.
     #[account(mut)]
     pub token_account: UncheckedAccount<'info>,
 
@@ -911,12 +906,13 @@ pub struct MigradeIdentity<'info> {
     pub treasury: UncheckedAccount<'info>,
 
     // below is for migration
-    /// CHECK: cannot check this wallet
+    /// CHECK: validated via seeds constraints on identity_state_old/mint_old/token_account_old
+    #[account(mut)]
     pub wallet_old: UncheckedAccount<'info>,
     #[account(
         mut,
         seeds = [b"identity", wallet_old.key().as_ref()],
-        bump, close = user
+        bump, close = wallet_old
     )]
     pub identity_state_old: Box<Account<'info, IdentityState>>,
 
@@ -1083,7 +1079,7 @@ pub struct AnchorMinted {
     pub commitment: [u8; 32],
 }
 #[event]
-pub struct MigrateIdentity {
+pub struct MigrateIdentityEvent {
     pub wallet_old: Pubkey,
     pub wallet_new: Pubkey,
     pub identity_old: Pubkey,
