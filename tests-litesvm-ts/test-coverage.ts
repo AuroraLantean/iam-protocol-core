@@ -18,6 +18,7 @@ import {
   MIN_STAKE,
   mintAuthorityPda,
   type Pdas,
+  programdataAddr,
   protocolConfigBump,
   protocolConfigPda,
   registryAddr,
@@ -30,18 +31,26 @@ import {
   acctIsNull,
   adminKp,
   balcAtaCk,
+  balcSolCk,
+  baseSOL,
+  closeChallenge,
+  closeVerificationResult,
   createChallenge,
   expireBlockhash,
   initializeProtocol,
+  migrateAdmin,
   mintAnchor,
   pdasAdmin,
   pdasBySignerKp,
   readAcct,
   registerValidator,
+  sendSol,
+  setProgramDataAcct,
   updateAnchor,
   updateProtocolConfig,
   user1Kp,
   verifyProof,
+  withdrawTreasury,
 } from "./litesvm-utils.ts";
 
 /*
@@ -350,6 +359,26 @@ test("registry.updateProtocolConfig() should fail by non-admin", async () => {
   );
 });
 
+test("registry.updateProtocolConfig() with verification fee", async () => {
+  console.log(
+    "\n----------------== registry.updateProtocolConfig() with verification fee",
+  );
+  signerKp = adminKp;
+  const verification_fee = BigInt(10);
+
+  updateProtocolConfig(signerKp, verification_fee, protocolConfigPda);
+
+  rawAccData = readAcct(protocolConfigPda, registryAddr);
+  const config = decodeProtocolConfigDev(rawAccData);
+  acctEqual(config.admin, signerKp.publicKey);
+  expect(config.min_stake).eq(MIN_STAKE);
+  expect(config.challenge_expiry).eq(CHALLENGE_EXPIRY);
+  expect(config.max_trust_score).eq(MAX_TRUST_SCORE);
+  expect(config.base_trust_increment).eq(BASE_TRUST_INCREMENT);
+  expect(config.bump).eq(protocolConfigBump);
+  expect(config.verification_fee).eq(verification_fee);
+});
+
 test("registry.registerValidator() with insufficient SOL", async () => {
   console.log(
     "\n----------------== registry.registerValidator() with insufficient SOL",
@@ -404,4 +433,40 @@ test("registry.registerValidator(): the same validator registering 2nd time shou
     vaultPda,
     expectedErr,
   );
+});
+
+test("registry.withdrawTreasury()", async () => {
+  console.log("\n----------------== registry.withdrawTreasury()");
+  // Send SOL to treasury PDA to simulate accumulated fees; Formally, those SOL should be deposited from mintAnchor(), migrateIdentity(), updateAnchor(), or resetIdentityState()
+  const depositAmount = baseSOL;
+  sendSol(user1Kp, treasuryPda, depositAmount);
+  balcSolCk(treasuryPda, depositAmount, "TreasuryPda");
+
+  signerKp = adminKp;
+  const amount = BigInt(50_000_000);
+  withdrawTreasury(signerKp, amount, protocolConfigPda, treasuryPda);
+});
+
+test("registry.migrateAdmin()", async () => {
+  console.log("\n----------------== registry.migrateAdmin()");
+  const upgrade_authorityKp = user1Kp;
+  const upgrade_authority = upgrade_authorityKp.publicKey;
+
+  setProgramDataAcct(programdataAddr, upgrade_authority, upgrade_authority);
+
+  migrateAdmin(upgrade_authorityKp, protocolConfigPda, programdataAddr);
+});
+
+test("entrosVerifier.closeChallenge()", async () => {
+  console.log("\n----------------== entrosVerifier.closeChallenge()");
+  signerKp = adminKp;
+  pdas = pdasBySignerKp(signerKp);
+  closeChallenge(signerKp, pdas.challengePda);
+});
+
+test("entrosVerifier.closeVerificationResult()", async () => {
+  console.log("\n----------------== entrosVerifier.closeVerificationResult()");
+  signerKp = adminKp;
+  pdas = pdasBySignerKp(signerKp);
+  closeVerificationResult(signerKp, pdas.verificationPda);
 });

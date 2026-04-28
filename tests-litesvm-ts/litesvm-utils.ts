@@ -1,8 +1,10 @@
+import { struct, u8, u32 } from "@solana/buffer-layout";
+import { publicKey, u64 } from "@solana/buffer-layout-utils";
 import { AccountLayout, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
   Keypair,
   LAMPORTS_PER_SOL,
-  PublicKey,
+  type PublicKey,
   SystemProgram,
   Transaction,
   TransactionInstruction,
@@ -21,6 +23,7 @@ import {
   loadProofFixture,
   numToBytes,
   registryAddr,
+  SYSTEM_PROGRAM,
   verifierAddr,
 } from "./encodeDecode.ts";
 
@@ -34,14 +37,14 @@ export const owner = ownerKp.publicKey;
 export const admin = adminKp.publicKey;
 export const user1 = user1Kp.publicKey;
 
-export const initSolBalc = BigInt(LAMPORTS_PER_SOL) * BigInt(10);
+export const baseSOL = BigInt(LAMPORTS_PER_SOL);
+export const initSolBalc = baseSOL * BigInt(10);
 console.log("initialize accounts by airdropping SOLs");
 
 svm.airdrop(owner, initSolBalc);
 svm.airdrop(admin, initSolBalc);
 svm.airdrop(user1, initSolBalc);
 
-export const SYSTEM_PROGRAM = new PublicKey("11111111111111111111111111111111"); //default or anchor.web3.SystemProgram.programId
 export const pdasAdmin = getPdas(admin);
 export const pdasUser1 = getPdas(user1);
 export const pdasBySignerKp = (signerKp: Keypair) => {
@@ -107,7 +110,19 @@ export const readAcct = (acct1: PublicKey, acctOwner?: PublicKey) => {
   if (acctOwner) acctEqual(pdaRaw?.owner, acctOwner);
   return rawAccountData;
 };
-export const balcSol = (target: PublicKey) => svm.getBalance(target);
+export const balcSol = (
+  target: PublicKey,
+  name = "SOL balc",
+  isVerbose = true,
+) => {
+  const rawAmount = svm.getBalance(target);
+  if (!rawAmount) {
+    if (isVerbose) console.log(name, ": is null");
+    return zero;
+  }
+  if (isVerbose) console.log(name, ":", rawAmount);
+  return rawAmount;
+};
 export const balcAta = (
   ata: PublicKey,
   name = "token balc",
@@ -122,6 +137,16 @@ export const balcAta = (
   const decoded = AccountLayout.decode(rawAcctData);
   if (isVerbose) console.log(name, ":", decoded.amount);
   return decoded.amount;
+};
+export const balcSolCk = (
+  target: PublicKey,
+  expectedAmount: bigint,
+  name: string,
+) => {
+  console.log("balcSolCk");
+  const amount = balcSol(target);
+  console.log(name, "SOL:", amount, amount / baseSOL);
+  expect(amount).eq(expectedAmount);
 };
 export const balcAtaCk = (
   ata: PublicKey,
@@ -217,6 +242,100 @@ export const registerValidator = (
     data: Buffer.from([...disc, ...argData]),
   });
   sendTxns(blockhash, [ix], [signer], progAddr, expectedErr);
+};
+
+export const withdrawTreasury = (
+  signer: Keypair, //admin
+  amount: bigint,
+  protocol_config: PublicKey,
+  treasury: PublicKey,
+  expectedErr = "",
+) => {
+  const disc = [40, 63, 122, 158, 144, 216, 83, 96]; //copied from Anchor IDL
+  const progAddr = registryAddr;
+
+  const argData = [...numToBytes(amount)];
+  const blockhash = svm.latestBlockhash();
+  const ix = new TransactionInstruction({
+    keys: [
+      { pubkey: signer.publicKey, isSigner: true, isWritable: true },
+      { pubkey: protocol_config, isSigner: false, isWritable: true },
+      { pubkey: treasury, isSigner: false, isWritable: true },
+      { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
+    ],
+    programId: progAddr,
+    data: Buffer.from([...disc, ...argData]),
+  });
+  sendTxns(blockhash, [ix], [signer], progAddr, expectedErr);
+};
+
+//-------------==
+export interface RawProgDataPda {
+  state_enum: number; // 4 bytes
+  slot: bigint; // 8 bytes
+  option_tag: number; //1 | 0;
+  upgrade_authority: PublicKey;
+}
+export const ProgDataLayout = struct<RawProgDataPda>([
+  u32("state_enum"),
+  u64("slot"),
+  u8("option_tag"),
+  publicKey("upgrade_authority"),
+]);
+export const PROGDATA_SIZE = ProgDataLayout.span;
+// programdataPda layout: 4 bytes (state enum) + 8 bytes (slot) + 1 byte (option tag) + 32 bytes (upgrade_authority)
+// len() < 45, data[12] == 1,
+export const setProgramDataAcct = (
+  progDataAddr: PublicKey,
+  upgrade_authority: PublicKey,
+  acctOwner: PublicKey,
+) => {
+  // see @solana/spl-token/src/state/mint.ts
+  console.log("PROGDATA_SIZE:", PROGDATA_SIZE);
+  if (PROGDATA_SIZE < 45) throw new Error("PROGDATA_SIZE should be >= 45");
+  const RawProgDataPdaData = Buffer.alloc(PROGDATA_SIZE);
+  ProgDataLayout.encode(
+    {
+      state_enum: 0, // 4 bytes
+      slot: BigInt(0), // 8 bytes
+      option_tag: 1, // fixed value; 1 byte
+      upgrade_authority: upgrade_authority,
+    },
+    RawProgDataPdaData,
+  );
+  svm.setAccount(progDataAddr, {
+    lamports: 1_000_000_000,
+    data: RawProgDataPdaData,
+    owner: acctOwner,
+    executable: false,
+  });
+};
+export const migrateAdmin = (
+  new_adminKp: Keypair,
+  protocol_config: PublicKey,
+  programdataPda: PublicKey,
+  expectedErr = "",
+) => {
+  const disc = [119, 155, 172, 213, 161, 86, 231, 120]; //copied from Anchor IDL
+  const progAddr = registryAddr;
+
+  //const argData = [...numToBytes(amount)];
+  const blockhash = svm.latestBlockhash();
+  const ix = new TransactionInstruction({
+    keys: [
+      {
+        pubkey: new_adminKp.publicKey,
+        isSigner: true,
+        isWritable: true,
+      },
+      { pubkey: protocol_config, isSigner: false, isWritable: true },
+      { pubkey: programdataPda, isSigner: false, isWritable: true },
+      { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
+    ],
+    programId: progAddr,
+    data: Buffer.from([...disc]),
+  });
+  sendTxns(blockhash, [ix], [new_adminKp], progAddr, expectedErr);
 };
 //-------------== entrosAnchor Program Methods
 export const mintAnchor = (
@@ -387,8 +506,9 @@ export const resetIdentityState = (
   sendTxns(blockhash, [ix], [signer], progAddr, expectedErr);
 };
 
+//-------------== Verifier
 export const createChallenge = (
-  signer: Keypair, //challenger
+  challenger: Keypair,
   nonce: number[],
   challengePda: PublicKey,
   expectedErr = "",
@@ -399,14 +519,54 @@ export const createChallenge = (
   const blockhash = svm.latestBlockhash();
   const ix = new TransactionInstruction({
     keys: [
-      { pubkey: signer.publicKey, isSigner: true, isWritable: true },
+      { pubkey: challenger.publicKey, isSigner: true, isWritable: true },
       { pubkey: challengePda, isSigner: false, isWritable: true },
       { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
     ],
     programId: progAddr,
     data: Buffer.from([...disc, ...argData]),
   });
-  sendTxns(blockhash, [ix], [signer], progAddr, expectedErr);
+  sendTxns(blockhash, [ix], [challenger], progAddr, expectedErr);
+};
+
+export const closeChallenge = (
+  challenger: Keypair,
+  challengePda: PublicKey,
+  expectedErr = "",
+) => {
+  const disc = [29, 156, 109, 17, 41, 99, 71, 236]; //copied from Anchor IDL
+  const progAddr = verifierAddr;
+  const blockhash = svm.latestBlockhash();
+  const ix = new TransactionInstruction({
+    keys: [
+      { pubkey: challenger.publicKey, isSigner: true, isWritable: true },
+      { pubkey: challengePda, isSigner: false, isWritable: true },
+      { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
+    ],
+    programId: progAddr,
+    data: Buffer.from([...disc]),
+  });
+  sendTxns(blockhash, [ix], [challenger], progAddr, expectedErr);
+};
+
+export const closeVerificationResult = (
+  verifier: Keypair,
+  verification_result: PublicKey,
+  expectedErr = "",
+) => {
+  const disc = [202, 203, 62, 127, 7, 157, 143, 12]; //copied from Anchor IDL
+  const progAddr = verifierAddr;
+  const blockhash = svm.latestBlockhash();
+  const ix = new TransactionInstruction({
+    keys: [
+      { pubkey: verifier.publicKey, isSigner: true, isWritable: true },
+      { pubkey: verification_result, isSigner: false, isWritable: true },
+      { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
+    ],
+    programId: progAddr,
+    data: Buffer.from([...disc]),
+  });
+  sendTxns(blockhash, [ix], [verifier], progAddr, expectedErr);
 };
 
 export const verifyProof = (
@@ -570,6 +730,14 @@ export const checkLogs = (
     //console.log("sendRes.logs()[logIndex]:", sendRes.logs()[logIndex]);
     expect(sendRes.logs()[simResMetalogs.length - 1]).eq(
       `Program ${programId} success`,
+    );
+    const computeUnitsConsumed = sendRes.computeUnitsConsumed();
+    const computeUnitsRemained = BigInt(200000) - computeUnitsConsumed;
+    console.log(
+      "computeUnits Consumed:",
+      computeUnitsConsumed,
+      ", Remained:",
+      computeUnitsRemained,
     );
   } else {
     console.log("txn failed");

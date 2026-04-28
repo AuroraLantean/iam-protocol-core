@@ -432,7 +432,7 @@ pub struct MigrateAdmin<'info> {
                 &anchor_lang::solana_program::bpf_loader_upgradeable::id()
             );
             programdata.key() == expected_programdata
-        } @ RegistryError::Unauthorized
+        } @ RegistryError::ProgramDataPda
     )]
     pub programdata: UncheckedAccount<'info>,
 

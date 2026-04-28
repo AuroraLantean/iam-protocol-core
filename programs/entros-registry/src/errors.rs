@@ -14,4 +14,6 @@ pub enum RegistryError {
     ArithmeticOverflow,
     #[msg("Insufficient treasury balance for withdrawal")]
     InsufficientTreasuryBalance,
+    #[msg("ProgramDataPda invalid")]
+    ProgramDataPda,
 }
