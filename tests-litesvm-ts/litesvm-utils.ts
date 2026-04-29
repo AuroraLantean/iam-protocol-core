@@ -23,6 +23,7 @@ import {
   loadProofFixture,
   numToBytes,
   registryAddr,
+  INSTRUCTIONS_SYSVAR,
   SYSTEM_PROGRAM,
   verifierAddr,
 } from "./encodeDecode.ts";
@@ -373,6 +374,10 @@ export const mintAnchor = (
       { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
       { pubkey: protocol_config, isSigner: false, isWritable: false }, //belongs to registry
       { pubkey: treasury, isSigner: false, isWritable: true },
+      // Instructions sysvar — required by master-list #146 Phase 3
+      // mint receipt verification. Read-only; safe to pass even when
+      // there's no preceding Ed25519 ix (handler logs and proceeds).
+      { pubkey: INSTRUCTIONS_SYSVAR, isSigner: false, isWritable: false },
     ],
     programId: progAddr,
     data: Buffer.from([...disc, ...argData]),
