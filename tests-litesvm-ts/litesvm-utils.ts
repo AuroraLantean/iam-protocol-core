@@ -20,10 +20,10 @@ import {
 import {
   anchorAddr,
   getPdas,
+  INSTRUCTIONS_SYSVAR,
   loadProofFixture,
   numToBytes,
   registryAddr,
-  INSTRUCTIONS_SYSVAR,
   SYSTEM_PROGRAM,
   verifierAddr,
 } from "./encodeDecode.ts";

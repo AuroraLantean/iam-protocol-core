@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_2022::{self, burn, Burn, spl_token_2022, Approve, close_account, CloseAccount};
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface, TokenMetadataInitialize, spl_token_metadata_interface::state::TokenMetadata, token_metadata_initialize};
 use spl_token_2022::extension::ExtensionType;
 use solana_security_txt::security_txt;
 
@@ -313,18 +313,31 @@ pub mod entros_anchor {
         let mint_seeds: &[&[u8]] = &[b"mint", user_key.as_ref(), &[ctx.bumps.mint]];
         let mint_authority_seeds: &[&[u8]] = &[b"mint_authority", &[ctx.bumps.mint_authority]];
 
+        let name = "token_name";
+        let symbol = "token_symbol";
+        let uri = "token_uri";
+        let token_metadata = TokenMetadata {
+            name: name.to_string(),
+            symbol: symbol.to_string(),
+            uri: uri.to_string(),
+            ..Default::default()
+        };
+        let meta_data_space = token_metadata.tlv_size_of()?;
+        
         let extensions = [
           ExtensionType::NonTransferable,
           ExtensionType::MintCloseAuthority,
+          ExtensionType::MetadataPointer
         ];
         // 2. Calculate Space
         let space = ExtensionType::try_calculate_account_len::<spl_token_2022::state::Mint>(&extensions)?;
     
         // 1. Allocate mint account with space for NonTransferable extension
         let rent = Rent::get()?;
-        let lamports = rent.minimum_balance(space);
+        let lamports = rent.minimum_balance(space + meta_data_space);
+
         #[cfg(feature = "debug-logs")]
-        msg!("create_account");
+        msg!("create_account on mint");
         system_program::create_account(
             CpiContext::new_with_signer(
                 ctx.accounts.system_program.to_account_info(),
@@ -356,10 +369,20 @@ pub mod entros_anchor {
             Some(&ctx.accounts.mint_authority.key()),
         )?;
         anchor_lang::solana_program::program::invoke(&ix, &[ctx.accounts.mint.to_account_info()])?;
+
+        #[cfg(feature = "debug-logs")]
+        msg!("initialize metadata_pointer");
+        let ix = spl_token_2022::extension::metadata_pointer::instruction::initialize(
+            ctx.accounts.token_program.key,
+            &ctx.accounts.mint.key(),
+            Some(ctx.accounts.mint_authority.key()),
+            Some(ctx.accounts.mint.key())
+        )?;
+        anchor_lang::solana_program::program::invoke(&ix, &[ctx.accounts.mint.to_account_info()])?;
         
         // 3. Initialize the mint (decimals=0, authority=mint_authority PDA)
         #[cfg(feature = "debug-logs")]
-        msg!("initialize_mint");
+        msg!("initialize_mint2");
         let ix = spl_token_2022::instruction::initialize_mint2(
             ctx.accounts.token_program.key,
             &ctx.accounts.mint.key(),
@@ -369,6 +392,26 @@ pub mod entros_anchor {
         )?;
         anchor_lang::solana_program::program::invoke(&ix, &[ctx.accounts.mint.to_account_info()])?;
 
+        // initialize the metadata after  initializing the Mint account
+        #[cfg(feature = "debug-logs")]
+        msg!("token_metadata_initialize");
+        token_metadata_initialize(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                TokenMetadataInitialize {
+                    mint: ctx.accounts.mint.to_account_info(),
+                    program_id: ctx.accounts.token_program.to_account_info(),
+                    mint_authority: ctx.accounts.mint_authority.to_account_info(),
+                    update_authority: ctx.accounts.mint_authority.to_account_info(),
+                    metadata: ctx.accounts.mint.to_account_info(),
+                },
+                &[mint_authority_seeds],
+            ),
+            name.to_string(),
+            symbol.to_string(),
+            uri.to_string(),
+        )?;
+        
         // 4. Create the user's Associated Token Account
         #[cfg(feature = "debug-logs")]
         msg!("create user ata");
